@@ -1,0 +1,33 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: dilek-kumbarasi
+  namespace: dilek-kumbarasi
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: dilek-kumbarasi
+  template:
+    metadata:
+      labels:
+        app: dilek-kumbarasi
+    spec:
+      imagePullSecrets:
+        - name: ghcr-secret
+      containers:
+        - name: dilek-kumbarasi
+          image: ghcr.io/ayavuzer/dilek-kumbarasi:latest
+          ports:
+            - containerPort: 3000
+          volumeMounts:
+            - name: dilek-storage
+              mountPath: /app/uploads
+              subPath: uploads
+            - name: dilek-storage
+              mountPath: /app/data
+              subPath: data
+      volumes:
+        - name: dilek-storage
+          persistentVolumeClaim:
+            claimName: dilek-kumbarasi-pvc
