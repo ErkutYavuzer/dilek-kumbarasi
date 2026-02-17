@@ -581,8 +581,8 @@
             <span class="badge" id="wish-count-badge">0 Dilek</span>
         </div>
         <div class="header-actions">
-            <button class="btn btn-gold" onclick="location.href='/upload.html'">📱 Dilek Ekle</button>
-            <button class="btn btn-blue" onclick="location.href='/display.html'">🖥️ Gösterim</button>
+            <button class="btn btn-gold" onclick="location.href='/upload'">📱 Dilek Ekle</button>
+            <button class="btn btn-blue" onclick="location.href='/display'">🖥️ Gösterim</button>
             <button class="btn btn-green" onclick="spotlightOff()">💫 Spotlight Kapat</button>
             <button class="btn btn-danger" onclick="confirmClearAll()">🗑️ Tümünü Sil</button>
         </div>
@@ -965,7 +965,13 @@
 
         // QR Code olustur
         (function () {
-            var uploadUrl = window.location.protocol + '//' + window.location.host + '/upload.html';
+            // Telefon için LAN IP kullan (WSL IP değil)
+            var host = window.location.hostname;
+            // WSL IP yerine gerçek LAN IP'yi tercih et
+            if (host === '172.19.48.1' || host === 'localhost' || host === '127.0.0.1') {
+                host = '192.168.2.75';
+            }
+            var uploadUrl = 'http://' + host + ':' + window.location.port + '/upload';
             var qrImg = document.createElement('img');
             qrImg.src = 'https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=' + encodeURIComponent(uploadUrl);
             qrImg.alt = 'QR Kod';

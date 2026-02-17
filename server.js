@@ -86,15 +86,15 @@ app.get('/', (req, res) => {
     res.sendFile(path.join(__dirname, 'public', 'display.html'));
 });
 
-// .html uzantısız erişim
-app.get('/admin', (req, res) => {
-    res.sendFile(path.join(__dirname, 'public', 'admin.html'));
+// Clean URLs - .html uzantısız erişim
+app.get('/display', (req, res) => {
+    res.sendFile(path.join(__dirname, 'public', 'display.html'));
 });
 app.get('/upload', (req, res) => {
     res.sendFile(path.join(__dirname, 'public', 'upload.html'));
 });
-app.get('/display', (req, res) => {
-    res.sendFile(path.join(__dirname, 'public', 'display.html'));
+app.get('/admin', (req, res) => {
+    res.sendFile(path.join(__dirname, 'public', 'admin.html'));
 });
 
 // Dilek yukleme endpoint'i
