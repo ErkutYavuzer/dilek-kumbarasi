@@ -86,6 +86,17 @@ app.get('/', (req, res) => {
     res.sendFile(path.join(__dirname, 'public', 'display.html'));
 });
 
+// .html uzantısız erişim
+app.get('/admin', (req, res) => {
+    res.sendFile(path.join(__dirname, 'public', 'admin.html'));
+});
+app.get('/upload', (req, res) => {
+    res.sendFile(path.join(__dirname, 'public', 'upload.html'));
+});
+app.get('/display', (req, res) => {
+    res.sendFile(path.join(__dirname, 'public', 'display.html'));
+});
+
 // Dilek yukleme endpoint'i
 app.post('/api/upload', upload.single('photo'), (req, res) => {
     try {
