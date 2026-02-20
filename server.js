@@ -336,6 +336,39 @@ app.get('/api/wishes', (req, res) => {
     res.json(wishes);
 });
 
+// Yerel IP adresini bul
+function getLocalIP() {
+    const nets = require('os').networkInterfaces();
+    let localIP = 'localhost';
+    
+    // Ağ arayüzlerini tara ve 192., 10., veya belli 172. ile başlayan (yaygın LAN IP'leri) adresi bul
+    for (const name of Object.keys(nets)) {
+        for (const net of nets[name]) {
+            // Dahili ve IPv6 değilse
+            if (net.family === 'IPv4' && !net.internal) {
+                // Hyper-V Default Switch'i atla (genelde 172.2x ile başlar)
+                if (name.toLowerCase().includes('default switch')) continue;
+                
+                // Özellikle 192.168.x.x gibi yaygın yerel ağ adreslerine öncelik ver
+                if (net.address.startsWith('192.168.') || net.address.startsWith('10.')) {
+                    return net.address;
+                }
+                
+                // Eğer hiçbiri eşleşmezse, ilk bulduğunu kaydet ama döngüye devam et (daha iyi bir eşleşme olabilir diye)
+                if (localIP === 'localhost') {
+                    localIP = net.address;
+                }
+            }
+        }
+    }
+    return localIP;
+}
+
+// Yerel IP adresini getir
+app.get('/api/local-ip', (req, res) => {
+    res.json({ ip: getLocalIP() });
+});
+
 // Tek dilek sil
 app.delete('/api/wishes/:id', (req, res) => {
     const { id } = req.params;

@@ -1659,15 +1659,20 @@
         }
 
         // ─── QR CODE ───
-        (function () {
-            var host = window.location.hostname;
-            if (host.startsWith('172.') || host === 'localhost' || host === '127.0.0.1') host = '192.168.1.127';
-            var url = 'http://' + host + ':' + (window.location.port || 3000) + '/upload';
-            var img = document.createElement('img');
-            img.src = 'https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=' + encodeURIComponent(url);
-            img.style.cssText = 'width:180px;height:180px;display:block;';
-            document.getElementById('qr-container').appendChild(img);
-            document.getElementById('qr-url').textContent = url;
+        (async function () {
+            try {
+                const res = await fetch('/api/local-ip');
+                const data = await res.json();
+                var host = data.ip || window.location.hostname;
+                var url = 'http://' + host + ':' + (window.location.port || 3000) + '/upload';
+                var img = document.createElement('img');
+                img.src = 'https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=' + encodeURIComponent(url);
+                img.style.cssText = 'width:180px;height:180px;display:block;';
+                document.getElementById('qr-container').appendChild(img);
+                document.getElementById('qr-url').textContent = url;
+            } catch (err) {
+                console.error("QR Code oluşturulamadı:", err);
+            }
         })();
 
         // ─── INIT ───
