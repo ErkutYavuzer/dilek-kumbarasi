@@ -1,9 +1,11 @@
+require('dotenv').config();
 const express = require('express');
 const http = require('http');
 const { Server } = require('socket.io');
 const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
+const { moderate } = require('./contentModerator');
 
 // Crash protection - prevent server from dying on errors
 process.on('uncaughtException', (err) => {
@@ -81,6 +83,15 @@ app.use(express.json());
 let wishes = loadWishes();
 console.log(`📂 ${wishes.length} dilek yüklendi.`);
 
+// AI Moderasyon ayarlari
+let moderationSettings = {
+    enabled: true,
+    checkText: true,
+    checkImage: true,
+    model: 'gemini-3-flash',
+    strictness: 'normal' // 'strict' | 'normal' | 'lenient'
+};
+
 // Ana sayfa
 app.get('/', (req, res) => {
     res.sendFile(path.join(__dirname, 'public', 'display.html'));
@@ -98,7 +109,7 @@ app.get('/admin', (req, res) => {
 });
 
 // Dilek yukleme endpoint'i
-app.post('/api/upload', upload.single('photo'), (req, res) => {
+app.post('/api/upload', upload.single('photo'), async (req, res) => {
     try {
         const { childName } = req.body;
 
@@ -109,9 +120,64 @@ app.post('/api/upload', upload.single('photo'), (req, res) => {
             return res.status(400).json({ error: 'Isim gerekli (en az 2 karakter)' });
         }
 
+        // 🤖 AI İçerik Moderasyonu
+        const filePath = path.join(uploadsDir, req.file.filename);
+        if (moderationSettings.enabled) {
+            const modResult = await moderate(childName.trim(), filePath, moderationSettings);
+            if (!modResult.allowed) {
+                if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
+                console.log(`🚫 İçerik reddedildi: ${childName} — ${modResult.reason}`);
+                return res.status(400).json({
+                    error: 'İçerik uygunsuz bulundu',
+                    reason: modResult.reason
+                });
+            }
+        } else {
+            console.log(`⏭️ Moderasyon devre dışı — ${childName} direkt geçirildi`);
+        }
+
+        // 🔍 Fotodaki metni oku (OCR)
+        let wishText = '';
+        try {
+            const imageData = fs.readFileSync(filePath);
+            const base64Image = imageData.toString('base64');
+            const ext = req.file.originalname.split('.').pop().toLowerCase();
+            const mimeType = (ext === 'png') ? 'image/png' : 'image/jpeg';
+
+            const OpenAI = require('openai');
+            const client = new OpenAI({
+                baseURL: process.env.ANTIGRAVITY_BASE_URL,
+                apiKey: process.env.ANTIGRAVITY_API_KEY,
+            });
+
+            const ocrResp = await client.chat.completions.create({
+                model: 'gemini-3-flash',
+                messages: [{
+                    role: 'user',
+                    content: [
+                        {
+                            type: 'image_url',
+                            image_url: { url: `data:${mimeType};base64,${base64Image}` }
+                        },
+                        {
+                            type: 'text',
+                            text: 'Bu fotoğrafta el yazısı ile yazılmış bir metin/şiir var. Lütfen fotoğraftaki TÜM metni baştan sona, satır satır, EKSİKSİZ bir şekilde oku ve metne dök. Hiçbir satırı, kelimeyi veya paragrafı kesinlikle atlama. Özetleme yapma. Sadece okuduğun metnin kendisini çıktı olarak ver.'
+                        }
+                    ]
+                }],
+                max_tokens: 800,
+                temperature: 0.2,
+            });
+            wishText = (ocrResp.choices[0]?.message?.content || '').trim();
+            console.log(`📝 OCR sonucu: "${wishText}"`);
+        } catch (ocrErr) {
+            console.warn('⚠️ OCR hatasi:', ocrErr.message);
+        }
+
         const wish = {
             id: Date.now().toString(),
             childName: childName.trim(),
+            wishText,
             photoUrl: `/uploads/${req.file.filename}`,
             timestamp: new Date().toISOString(),
             isSpotlight: false
@@ -120,7 +186,7 @@ app.post('/api/upload', upload.single('photo'), (req, res) => {
         wishes.push(wish);
         saveWishes();
         io.emit('new-wish', wish);
-        console.log('Yeni dilek:', wish.childName);
+        console.log(`✅ Yeni dilek onaylandı: ${wish.childName}`);
         res.json({ success: true, wish });
     } catch (error) {
         console.error('Yukleme hatasi:', error);
@@ -128,7 +194,32 @@ app.post('/api/upload', upload.single('photo'), (req, res) => {
     }
 });
 
-// Spotlight modunu aktifleştir (kumbaradan çekilen dilek)
+// Moderasyon ayarlarini getir / guncelle
+app.get('/api/moderation', (req, res) => {
+    res.json(moderationSettings);
+});
+
+app.post('/api/moderation/toggle', (req, res) => {
+    moderationSettings.enabled = !moderationSettings.enabled;
+    const state = moderationSettings.enabled ? 'ACIK' : 'KAPALI';
+    console.log(`🤖 AI Moderasyon: ${state}`);
+    io.emit('moderation-state', moderationSettings);
+    res.json({ success: true, ...moderationSettings });
+});
+
+app.post('/api/moderation/settings', (req, res) => {
+    const { enabled, checkText, checkImage, model, strictness } = req.body;
+    if (typeof enabled === 'boolean') moderationSettings.enabled = enabled;
+    if (typeof checkText === 'boolean') moderationSettings.checkText = checkText;
+    if (typeof checkImage === 'boolean') moderationSettings.checkImage = checkImage;
+    if (model) moderationSettings.model = model;
+    if (strictness) moderationSettings.strictness = strictness;
+    console.log('🤖 Moderasyon ayarlari guncellendi:', moderationSettings);
+    io.emit('moderation-state', moderationSettings);
+    res.json({ success: true, ...moderationSettings });
+});
+
+// Spotlight modunu aktiflesir (kumbaradan cekilen dilek)
 app.post('/api/spotlight/:id', (req, res) => {
     const { id } = req.params;
 
@@ -226,7 +317,7 @@ app.get('/api/auto-spotlight/status', (req, res) => {
 });
 
 // === TEMA SİSTEMİ ===
-let currentTheme = 'default';
+let currentTheme = 'iyilik';
 
 app.get('/api/theme', (req, res) => {
     res.json({ theme: currentTheme });
@@ -308,6 +399,7 @@ server.listen(PORT, '0.0.0.0', () => {
     const nets = require('os').networkInterfaces();
     let localIP = 'localhost';
     for (const name of Object.keys(nets)) {
+        if (name.toLowerCase().includes('vethernet')) continue;
         for (const net of nets[name]) {
             if (net.family === 'IPv4' && !net.internal) {
                 localIP = net.address;

@@ -101,6 +101,10 @@ class WishDisplay {
 
         this.socket.on('all-wishes', (wishes) => {
             console.log('📥 Mevcut dilekler:', wishes.length);
+            // Reconnect'te duplicate olmaması icin once temizle
+            this.container.querySelectorAll('.wish-card').forEach(c => c.remove());
+            this.wishes = [];
+            this.wishCards = [];
             wishes.forEach(wish => this.addWish(wish, false));
             this.updateCounter();
         });
@@ -189,6 +193,12 @@ class WishDisplay {
 
     // === WISH CARDS ===
     addWish(wish, animate = true) {
+        // Duplicate guard: ayni ID zaten varsa ekleme
+        if (this.wishes.some(w => w.id === wish.id)) {
+            console.warn('⚠️ Duplicate wish skipped:', wish.id);
+            return;
+        }
+
         this.emptyState.style.display = 'none';
 
         // Rich balloon colors with dark variants for gradient
@@ -220,19 +230,27 @@ class WishDisplay {
 
         card.innerHTML = `
             <div class="balloon-body">
-                <img src="${wish.photoUrl}" alt="${wish.childName}">
+                ${wish.wishText ? `<div class="wish-text">${wish.wishText.replace(/\n/g, '<br>')}</div>` : '<div class="wish-text" style="font-size:20px;opacity:0.6;font-weight:600;">(Fotoğraftan yazı okunamadı)</div>'}
                 <div class="child-name">${wish.childName}</div>
             </div>
             <div class="balloon-string"></div>
         `;
 
+        // Remove constraints so they can spawn edge-to-edge
         const cw = this.container.offsetWidth;
         const ch = this.container.offsetHeight;
-        const padding = 60;
-        const maxX = cw - 500;
-        const maxY = ch - 700;
-        const x = padding + Math.random() * Math.max(0, maxX - padding);
-        const y = padding + Math.random() * Math.max(0, maxY - padding);
+        const padding = 0;
+        const maxX = cw - 520;
+        const maxY = ch - 600;
+
+        let x = padding + Math.random() * Math.max(0, maxX - padding);
+        let y = padding + Math.random() * Math.max(0, maxY - padding);
+
+        // Logo Obstacle avoidance on spawn (approx x: 1300 to 2900, y: 0 to 480)
+        const logoLeft = 1300, logoRight = 2900, logoBottom = 480;
+        if (x + 520 > logoLeft && x < logoRight && y < logoBottom) {
+            y = logoBottom + 50 + Math.random() * 200; // Force spawn successfully below logo
+        }
 
         card.style.left = x + 'px';
         card.style.top = y + 'px';
@@ -251,11 +269,11 @@ class WishDisplay {
             element: card,
             x: x,
             y: y,
-            vx: (Math.random() - 0.5) * 3,
-            vy: (Math.random() - 0.5) * 3,
+            vx: (Math.random() - 0.5) * 10,     // Slashed speed to 10 for relaxed gliding
+            vy: (Math.random() - 0.5) * 10,     // Slashed speed to 10 for relaxed gliding
             rotation: rotation,
-            rotationSpeed: (Math.random() - 0.5) * 0.3,
-            radius: 230 // half of balloon width for collision
+            rotationSpeed: (Math.random() - 0.5) * 0.8, // Reduced rotation for calmer movement
+            radius: 260
         };
         this.wishCards.push(cardData);
 
@@ -280,17 +298,24 @@ class WishDisplay {
                 cardData.y += cardData.vy;
                 cardData.rotation += cardData.rotationSpeed;
 
-                // Wall bounds — use offsetWidth (not getBoundingClientRect which is scaled)
+                // Wall bounds
                 const cw = this.container.offsetWidth;
                 const ch = this.container.offsetHeight;
-                const padding = 60;
-                const maxX = cw - 500;
-                const maxY = ch - 700;
 
-                if (cardData.x < padding) { cardData.x = padding; cardData.vx *= -1; }
+                const paddingSides = -100; // Let them float slightly out of bounds before bouncing
+                const paddingTop = -100;
+
+                // Calculate max boundaries (balloon dims: 520x600) + allowing 100px overlap off-camera
+                const maxX = cw - 420;
+                const maxY = ch - 500;
+
+                // Bounce off general walls
+                if (cardData.x < paddingSides) { cardData.x = paddingSides; cardData.vx *= -1; }
                 if (cardData.x > maxX) { cardData.x = maxX; cardData.vx *= -1; }
-                if (cardData.y < padding) { cardData.y = padding; cardData.vy *= -1; }
+                if (cardData.y < paddingTop) { cardData.y = paddingTop; cardData.vy *= -1; }
                 if (cardData.y > maxY) { cardData.y = maxY; cardData.vy *= -1; }
+
+                // Logo Obstacle Removed - Balloons fly freely everywhere
 
                 if (Math.abs(cardData.rotation) > 15) {
                     cardData.rotationSpeed *= -1;
@@ -343,9 +368,9 @@ class WishDisplay {
                 }
             }
 
-            // Apply speed limit to prevent runaway velocities
+            // Apply speed limit for relaxed 4k velocities
             cards.forEach(cardData => {
-                const maxSpeed = 4;
+                const maxSpeed = 6; // Slashed from 12 to 6 (50% slower)
                 const speed = Math.sqrt(cardData.vx * cardData.vx + cardData.vy * cardData.vy);
                 if (speed > maxSpeed) {
                     cardData.vx = (cardData.vx / speed) * maxSpeed;

@@ -5,7 +5,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>İyilik Kumbarası - Gösterim</title>
-    <link rel="stylesheet" href="/css/themes.css">
+    <link rel="stylesheet" href="/css/themes.css?v=2.0.3">
     <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800;900&display=swap" rel="stylesheet">
     <style>
         * {
@@ -35,8 +35,7 @@
             width: 4224px;
             height: 1536px;
             position: relative;
-            background: url('/images/background.png') no-repeat center center;
-            background-size: 4224px 1536px;
+            /* Arkaplan themes.css tarafindan yonetiliyor */
         }
 
         /* Background image covers entire viewport - no animation needed */
@@ -93,7 +92,7 @@
         /* Balloon wish card */
         .wish-card {
             position: absolute;
-            width: 460px;
+            width: 520px;
             cursor: pointer;
             will-change: left, top, transform;
             display: flex;
@@ -103,8 +102,8 @@
 
         .balloon-body {
             position: relative;
-            width: 460px;
-            height: 540px;
+            width: 520px;
+            height: 600px;
             background:
                 radial-gradient(circle at 35% 25%, rgba(255, 255, 255, 0.35) 0%, transparent 50%),
                 radial-gradient(circle at 65% 75%, rgba(0, 0, 0, 0.15) 0%, transparent 50%),
@@ -227,7 +226,7 @@
             }
         }
 
-        /* Gentle floating bob animation */
+        /* Exaggerated floating bob animation */
         .wish-card {
             animation: gentleBob var(--bob-duration, 4s) ease-in-out infinite;
             animation-delay: var(--bob-delay, 0s);
@@ -241,7 +240,7 @@
             }
 
             50% {
-                margin-top: -15px;
+                margin-top: -40px;
             }
         }
 
@@ -271,47 +270,40 @@
 
         .wish-card .wish-text {
             text-align: center;
-            font-size: 36px;
+            font-size: 34px;
             font-weight: 800;
-            color: white;
-            text-shadow: 0 2px 6px rgba(0, 0, 0, 0.25);
-            line-height: 1.3;
+            color: #ffffff;
+            text-shadow:
+                0 2px 4px rgba(0, 0, 0, 0.4),
+                0 4px 10px rgba(0, 0, 0, 0.3);
+            line-height: 1.4;
             word-break: break-word;
-            max-width: 360px;
-            max-height: 280px;
+            overflow-wrap: break-word;
+            width: 440px;
+            max-height: 440px;
             overflow: hidden;
-            position: relative;
-            z-index: 1;
-            padding: 0 16px;
-        }
-
-        .wish-card img {
-            width: 400px;
-            height: 400px;
-            object-fit: cover;
-            object-position: center;
-            border-radius: 50%;
-            display: block;
-            border: 6px solid rgba(255, 255, 255, 0.5);
-            box-shadow: 0 8px 25px rgba(0, 0, 0, 0.2);
-            position: relative;
-            z-index: 1;
-            flex-shrink: 0;
-            transform: scale(1.25);
-            clip-path: circle(48%);
+            position: absolute;
+            top: 42%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            z-index: 10;
+            padding: 0 10px;
         }
 
         .wish-card .child-name {
             text-align: center;
-            padding: 0 24px;
+            padding: 0 16px;
             font-size: 32px;
             font-weight: 800;
             color: white;
-            text-shadow: 0 2px 6px rgba(0, 0, 0, 0.3);
-            position: relative;
-            z-index: 1;
+            text-shadow: 0 2px 6px rgba(0, 0, 0, 0.5);
+            position: absolute;
+            bottom: 40px;
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 12;
             line-height: 1.2;
-            max-width: 400px;
+            width: 80%;
             overflow: hidden;
             text-overflow: ellipsis;
             white-space: nowrap;
@@ -528,6 +520,42 @@
                 opacity: 0;
             }
         }
+
+        /* Modern CSS pseudo-3D parallax overlay trick */
+        .logo-layer {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 50;
+            pointer-events: none;
+            background: inherit;
+
+            /* Complex polygon that only masks the specific logos:
+               1. Top-Left Logo (0 to 450px X, 0 to 450px Y)
+               2. Center Logo (1300px to 2900px X, 0 to 500px Y)
+               3. Top-Right Logo (3700px to 4224px X, 0 to 450px Y)
+               It traces the top edge, drops down to frame each logo, and goes back up. */
+            clip-path: polygon(
+                    /* Start top left */
+                    0 0,
+
+                    /* Left Logo */
+                    0 450px, 450px 450px, 450px 0,
+
+                    /* Gap to Center */
+                    1300px 0,
+
+                    /* Center Logo */
+                    1300px 500px, 2900px 500px, 2900px 0,
+
+                    /* Gap to Right */
+                    3700px 0,
+
+                    /* Right Logo */
+                    3700px 450px, 100% 450px, 100% 0);
+        }
     </style>
 </head>
 
@@ -580,27 +608,26 @@
 
     <script src="/socket.io/socket.io.js"></script>
     <script>
-        // Auto-scale 4224x1536 canvas to fit actual screen
+        // Auto-scale 4224x1536 canvas to cover actual screen without gaps
         const DESIGN_WIDTH = 4224;
         const DESIGN_HEIGHT = 1536;
 
         function scaleToFit() {
             const scaleX = window.innerWidth / DESIGN_WIDTH;
             const scaleY = window.innerHeight / DESIGN_HEIGHT;
-            const scale = Math.min(scaleX, scaleY);
-            document.body.style.transform = `scale(${scale})`;
+            // Stretch X and Y independently. 
+            // This guarantees absolutely 0 letterboxing and 0 cropping (perfect for LED hardware mapping)
+            document.body.style.transform = `scale(${scaleX}, ${scaleY})`;
             document.body.style.transformOrigin = 'top left';
-            // Center if aspect ratio doesn't match
-            const offsetX = (window.innerWidth - DESIGN_WIDTH * scale) / 2;
-            const offsetY = (window.innerHeight - DESIGN_HEIGHT * scale) / 2;
-            document.body.style.marginLeft = offsetX + 'px';
-            document.body.style.marginTop = offsetY + 'px';
+            // Since it stretches perfectly, no margin offsets are needed
+            document.body.style.marginLeft = '0px';
+            document.body.style.marginTop = '0px';
         }
 
         scaleToFit();
         window.addEventListener('resize', scaleToFit);
     </script>
-    <script src="js/display.js"></script>
+    <script src="js/display.js?v=2.0.2"></script>
 </body>
 
 </html>
